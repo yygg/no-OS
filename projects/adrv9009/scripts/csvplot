@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+import pandas as pd
+import numpy as np
+import sys
+import matplotlib.pyplot as plt
+
+def twoscompl(val, bits):
+    if (val >> (bits - 1)) != 0:
+        val = val - (1 << bits)
+    return val
+
+colnames = ['arx1-i', 'arx1-q', 'arx2-i', 'arx2-q', 'brx1-i', 'brx1-q', 'brx2-i', 'brx2-q']
+
+data = pd.read_csv(sys.argv[1], names=colnames)
+zerocrossings = {}
+
+colnames = [c for c in colnames if not data[c].isnull().values.any()]
+maxchannels = int(len(colnames) / 2)
+fig = plt.figure()
+ax = fig.add_subplot(maxchannels, 1, 1)
+
+for i, col in enumerate(colnames):
+    # convert from twos complement back to signed integer
+    signedcol = [twoscompl(x, 16) for x in data[col]]
+    data[col] = signedcol
+
+    # find all zero crossings
+    zerocrossings[col] = np.where(np.diff(np.signbit(signedcol)))[0]
+
+    # keep only ascending zero crossings
+    asc = []
+    for x in zerocrossings[col]:
+        try:
+            if data[col][x-1] < 0 and data[col][x+1] > 0:
+                asc.append(x)
+        except KeyError:
+            pass
+    zerocrossings[col] = asc
+
+    if i % 2 == 0:
+        ax = fig.add_subplot(maxchannels, 1, int(i/2 + 1), sharex=ax, sharey=ax)
+        ax.axhline(0, linestyle=':', color='black')
+    ax.plot(data[col], label=col[-1:])
+    plt.ylabel(col[:4])
+
+try:
+    print('first ascending zero-crossing index offset:')
+    print('arx1-brx1:\n\ti - {}\n\tq - {}'.format(
+        abs(zerocrossings['arx1-i'][0] - zerocrossings['brx1-i'][0]),
+        abs(zerocrossings['arx1-q'][0] - zerocrossings['brx1-q'][0])))
+    print('arx2-brx2:\n\ti - {}\n\tq - {}'.format(
+        abs(zerocrossings['arx2-i'][0] - zerocrossings['brx2-i'][0]),
+        abs(zerocrossings['arx2-q'][0] - zerocrossings['brx2-q'][0])))
+except (IndexError, KeyError) as e:
+    pass
+
+handles, labels = ax.get_legend_handles_labels()
+fig.legend(handles, labels, loc='upper center')
+plt.show()
