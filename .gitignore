@@ -8,3 +8,5 @@ sw.elf
 xsct.log
 RemoteSystemsTempFiles
 build
+dfp_drivers
+aducm_project
